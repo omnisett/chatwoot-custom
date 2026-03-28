@@ -29,6 +29,7 @@ module OmniAi
         if body.present?
           begin
             payload = JSON.parse(body).with_indifferent_access
+            Rails.logger.info("[OmniAi::FB] POST /bot received, object=#{payload[:object]}, entries=#{payload[:entry]&.size}")
             if payload[:object] == 'page' && comment_entries?(payload[:entry])
               page_id = payload[:entry]&.first&.dig(:id)
               OmniAi::CommentForwarder.forward(
@@ -37,6 +38,9 @@ module OmniAi
                 page_id: page_id
               )
               Rails.logger.info("[OmniAi] Forwarded Facebook comment webhook (page_id=#{page_id})")
+            elsif payload[:object] == 'page'
+              fields = payload[:entry]&.flat_map { |e| (e[:changes] || e['changes'] || []).map { |c| c[:field] || c['field'] } }
+              Rails.logger.info("[OmniAi::FB] Page webhook but not a comment. Fields: #{fields}")
             end
           rescue JSON::ParserError => e
             Rails.logger.warn("[OmniAi::FacebookCommentMiddleware] JSON parse error: #{e.message}")
