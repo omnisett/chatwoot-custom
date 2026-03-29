@@ -17,10 +17,13 @@ class Instagram::WebhooksBaseService
 
     if @contact
       # Update contact name if it's still a Haikunator-generated name or generic placeholder
-      # and we now have real user data from Instagram API
-      if user['name'].present? && (@contact.name.blank? || @contact.name.match?(/^(Instagram User|Unknown)/) ||
-         @contact.name.match?(/\A[a-z]+-[a-z]+-\d+\z/))
-        @contact.update!(name: user['username'].presence || user['name'])
+      if @contact.name.blank? || @contact.name.match?(/\A[a-z]+-[a-z]+-\d+\z/) ||
+         @contact.name.match?(/^(Instagram User|Unknown)/)
+        # Best name source: API username > API name > already-known IG username from additional_attributes
+        best_name = user['username'].presence ||
+                    (user['name'].presence unless user['name'].to_s.match?(/^(Instagram User|Unknown)/)) ||
+                    @contact.additional_attributes&.dig('social_instagram_user_name').presence
+        @contact.update!(name: best_name) if best_name.present? && best_name != @contact.name
       end
       update_instagram_profile_link(user)
       return

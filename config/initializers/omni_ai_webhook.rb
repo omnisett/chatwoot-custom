@@ -48,10 +48,14 @@ Rails.application.config.after_initialize do
         existing.update!(subscriptions: desired_subs)
         Rails.logger.info("[OmniAI Webhook] Updated subscriptions to #{desired_subs.join(', ')}")
       end
-      # Ensure secret is set (may be missing if webhook was created before secret column migration)
+      # Ensure secret is set — use update! (not update_column) so encrypts :secret works correctly
       if token.present?
-        existing.update_column(:secret, token) rescue nil
-        Rails.logger.info("[OmniAI Webhook] Ensured webhook secret is set.")
+        begin
+          existing.update!(secret: token)
+          Rails.logger.info("[OmniAI Webhook] Ensured webhook secret is set.")
+        rescue StandardError => e
+          Rails.logger.warn("[OmniAI Webhook] Could not update secret: #{e.message}")
+        end
       end
       next
     end
@@ -62,7 +66,8 @@ Rails.application.config.after_initialize do
     )
 
     # Override the auto-generated secret with our shared token if provided
-    webhook.update_column(:secret, token) if token.present?
+    # Use update! so encrypts :secret works correctly (update_column bypasses encryption)
+    webhook.update!(secret: token) if token.present?
 
     Rails.logger.info("[OmniAI Webhook] Created webhook id=#{webhook.id} url=#{url} for account #{account_id}")
   rescue StandardError => e
