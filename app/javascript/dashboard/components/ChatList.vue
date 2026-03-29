@@ -30,7 +30,6 @@ import TeleportWithDirection from 'dashboard/components-next/TeleportWithDirecti
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import IntersectionObserver from 'dashboard/components/IntersectionObserver.vue';
 import ConversationResolveAttributesModal from 'dashboard/components-next/ConversationWorkflow/ConversationResolveAttributesModal.vue';
-import CommentPostsView from './CommentPostsView.vue';
 
 import { useUISettings } from 'dashboard/composables/useUISettings';
 import { useAlert } from 'dashboard/composables';
@@ -101,7 +100,6 @@ const foldersQuery = ref({});
 const showAddFoldersModal = ref(false);
 const showDeleteFoldersModal = ref(false);
 const isContextMenuOpen = ref(false);
-const viewMode = ref('conversations'); // 'conversations' or 'byPosts'
 const appliedFilter = ref([]);
 const advancedFilterTypes = ref(
   advancedFilterOptions.map(filter => ({
@@ -899,44 +897,6 @@ watch(conversationFilters, (newVal, oldVal) => {
       @basic-filter-change="onBasicFilterChange"
     />
 
-    <!-- View Mode Toggle: Conversations vs By Posts -->
-    <div class="flex items-center border-b border-n-weak bg-n-surface-1 px-3 py-1.5 gap-1">
-      <button
-        :class="[
-          'text-xs px-2.5 py-1 rounded-md font-medium transition-colors',
-          viewMode === 'conversations'
-            ? 'bg-n-brand text-white'
-            : 'text-n-slate-11 hover:bg-n-alpha-1'
-        ]"
-        @click="viewMode = 'conversations'"
-      >
-        <span class="i-lucide-message-circle text-xs mr-1" />
-        {{ $t('CHAT_LIST.VIEW_MODE.CONVERSATIONS') || 'All' }}
-      </button>
-      <button
-        :class="[
-          'text-xs px-2.5 py-1 rounded-md font-medium transition-colors',
-          viewMode === 'byPosts'
-            ? 'bg-n-brand text-white'
-            : 'text-n-slate-11 hover:bg-n-alpha-1'
-        ]"
-        @click="viewMode = 'byPosts'"
-      >
-        <span class="i-lucide-layout-list text-xs mr-1" />
-        {{ $t('CHAT_LIST.VIEW_MODE.BY_POSTS') || 'By Posts' }}
-      </button>
-    </div>
-
-    <!-- By Posts View (when toggled) -->
-    <CommentPostsView
-      v-if="viewMode === 'byPosts'"
-      :conversation-inbox="conversationInbox"
-      class="flex-1 min-h-0"
-    />
-
-    <!-- Standard conversation list (existing code below) -->
-    <template v-if="viewMode === 'conversations'">
-
     <TeleportWithDirection
       v-if="showAddFoldersModal"
       to="#saveFilterTeleportTarget"
@@ -1053,6 +1013,5 @@ watch(conversationFilters, (newVal, oldVal) => {
       ref="resolveAttributesModalRef"
       @submit="handleResolveWithAttributes"
     />
-    </template>
   </div>
 </template>
