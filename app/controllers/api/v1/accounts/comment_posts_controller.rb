@@ -53,6 +53,8 @@ class Api::V1::Accounts::CommentPostsController < Api::V1::Accounts::BaseControl
   private
 
   def check_authorization
+    return if action_name == 'upsert'
+
     authorize(Current.account) if defined?(authorize)
   end
 
