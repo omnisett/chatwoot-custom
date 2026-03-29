@@ -10,7 +10,15 @@ class ContactInboxBuilder
     # SendReplyJob uses source_id as the Meta API recipient — a random UUID won't work.
     if !@source_id && (@inbox.instagram? || @inbox.facebook?)
       existing = ::ContactInbox.find_by(contact_id: @contact.id, inbox_id: @inbox.id)
-      return existing if existing
+      if existing
+        # Auto-heal: if source_id is a placeholder and contact now has a real identifier,
+        # update so SendReplyJob can deliver DMs via the Messenger/Instagram API.
+        if existing.source_id&.start_with?('api-') && @contact&.identifier.present?
+          existing.update!(source_id: @contact.identifier)
+          Rails.logger.info("[ContactInboxBuilder] Healed source_id from #{existing.source_id_previously_was} → #{@contact.identifier}")
+        end
+        return existing
+      end
     end
 
     @source_id ||= generate_source_id
