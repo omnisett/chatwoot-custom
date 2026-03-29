@@ -39,20 +39,26 @@ Rails.application.config.after_initialize do
       next
     end
 
+    desired_subs = %w[message_created message_updated conversation_created conversation_status_changed conversation_updated]
+
     existing = account.webhooks.find_by(url: url)
     if existing
-      Rails.logger.info("[OmniAI Webhook] Webhook already exists (id=#{existing.id}), ensuring subscriptions are up to date.")
-      desired_subs = %w[message_created message_updated conversation_created conversation_status_changed conversation_updated]
+      Rails.logger.info("[OmniAI Webhook] Webhook already exists (id=#{existing.id}), ensuring config is up to date.")
       unless (desired_subs - existing.subscriptions).empty?
         existing.update!(subscriptions: desired_subs)
         Rails.logger.info("[OmniAI Webhook] Updated subscriptions to #{desired_subs.join(', ')}")
+      end
+      # Ensure secret is set (may be missing if webhook was created before secret column migration)
+      if token.present?
+        existing.update_column(:secret, token) rescue nil
+        Rails.logger.info("[OmniAI Webhook] Ensured webhook secret is set.")
       end
       next
     end
 
     webhook = account.webhooks.create!(
       url: url,
-      subscriptions: %w[message_created message_updated conversation_created conversation_status_changed conversation_updated]
+      subscriptions: desired_subs
     )
 
     # Override the auto-generated secret with our shared token if provided
