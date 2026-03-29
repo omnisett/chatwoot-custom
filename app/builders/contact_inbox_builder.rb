@@ -5,6 +5,14 @@ class ContactInboxBuilder
   pattr_initialize [:contact, :inbox, :source_id, { hmac_verified: false }]
 
   def perform
+    # For Instagram/Facebook API-initiated conversations (no explicit source_id):
+    # reuse the existing contact_inbox so the real IGSID/FBID is preserved.
+    # SendReplyJob uses source_id as the Meta API recipient — a random UUID won't work.
+    if !@source_id && (@inbox.instagram? || @inbox.facebook?)
+      existing = ::ContactInbox.find_by(contact_id: @contact.id, inbox_id: @inbox.id)
+      return existing if existing
+    end
+
     @source_id ||= generate_source_id
     create_contact_inbox if source_id.present?
   end
@@ -24,11 +32,10 @@ class ContactInboxBuilder
     when 'Channel::Api', 'Channel::WebWidget'
       SecureRandom.uuid
     when 'Channel::FacebookPage', 'Channel::Instagram'
-      # Allow API-initiated conversations for Instagram/Facebook channels.
-      # Always generate a UUID — never use the contact identifier, because the identifier
-      # equals the IGSID/FBID which is already taken by the DM-webhook contact_inbox
-      # (unique index on inbox_id + source_id would cause a 422 RecordNotUnique).
-      "api-#{SecureRandom.uuid}"
+      # Use the contact's identifier (IGSID/FBID) so SendReplyJob can address
+      # the message to the correct Instagram/Facebook recipient.
+      # Falls back to a UUID only when the contact has no identifier.
+      @contact&.identifier || "api-#{SecureRandom.uuid}"
     else
       raise "Unsupported operation for this channel: #{@inbox.channel_type}"
     end
