@@ -423,6 +423,7 @@ Rails.application.routes.draw do
           end
         end
       end
+      post 'omni_ai/comment_reply', to: '/omni_ai/comment_replies#create'
     end
 
     namespace :v2 do
@@ -463,7 +464,6 @@ Rails.application.routes.draw do
           end
         end
       end
-      post 'omni_ai/comment_reply', to: '/omni_ai/comment_replies#create'
     end
   end
 
