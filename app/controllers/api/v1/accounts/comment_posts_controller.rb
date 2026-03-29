@@ -41,6 +41,10 @@ class Api::V1::Accounts::CommentPostsController < Api::V1::Accounts::BaseControl
     post.assign_attributes(upsert_params)
     post.last_comment_at = Time.current
     post.conversations_count = (post.conversations_count || 0) + 1 if post.new_record? || params[:increment_count]
+
+    # Fetch metadata from Graph API server-side if not provided and post_text is blank
+    fetch_post_metadata_from_graph(post) if post.post_text.blank? && post.post_id.present?
+
     post.save!
 
     render json: { data: serialize_post(post) }, status: post.previously_new_record? ? :created : :ok
@@ -58,6 +62,55 @@ class Api::V1::Accounts::CommentPostsController < Api::V1::Accounts::BaseControl
       :post_text, :post_media_url, :post_media_type,
       :post_permalink, :post_created_at
     )
+  end
+
+  def fetch_post_metadata_from_graph(post)
+    inbox = post.inbox_id.present? ? Inbox.find_by(id: post.inbox_id) : nil
+    return unless inbox
+
+    token = resolve_channel_token(inbox)
+    return unless token.present?
+
+    fields = if post.platform == 'instagram'
+               'caption,media_url,media_type,permalink,timestamp'
+             else
+               'message,full_picture,permalink_url,created_time,type'
+             end
+
+    response = HTTParty.get(
+      "https://graph.facebook.com/v22.0/#{post.post_id}",
+      query: { fields: fields, access_token: token },
+      timeout: 5
+    )
+    return unless response.success?
+
+    data = response.parsed_response
+    if post.platform == 'instagram'
+      post.post_text = data['caption'] if data['caption'].present?
+      post.post_media_url = data['media_url'] if data['media_url'].present?
+      post.post_media_type = data['media_type']&.downcase if data['media_type'].present?
+      post.post_permalink = data['permalink'] if data['permalink'].present?
+      post.post_created_at = data['timestamp'] if data['timestamp'].present?
+    else
+      post.post_text = data['message'] if data['message'].present?
+      post.post_media_url = data['full_picture'] if data['full_picture'].present?
+      post.post_media_type = data['type'] == 'video' ? 'video' : (data['full_picture'].present? ? 'image' : 'text')
+      post.post_permalink = data['permalink_url'] if data['permalink_url'].present?
+      post.post_created_at = data['created_time'] if data['created_time'].present?
+    end
+  rescue StandardError => e
+    Rails.logger.warn("[CommentPosts] Graph API metadata fetch failed: #{e.message}")
+  end
+
+  def resolve_channel_token(inbox)
+    channel = inbox.channel
+    return nil unless channel
+
+    if channel.respond_to?(:page_access_token)
+      channel.page_access_token
+    elsif channel.respond_to?(:access_token)
+      channel.access_token
+    end
   end
 
   def serialize_post(post)

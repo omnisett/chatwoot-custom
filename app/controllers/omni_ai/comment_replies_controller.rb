@@ -28,7 +28,7 @@ class OmniAi::CommentRepliesController < ActionController::API
     inbox = Inbox.find_by(id: inbox_id)
     return render json: { error: 'inbox not found' }, status: :not_found unless inbox
 
-    access_token = inbox.channel.try(:access_token)
+    access_token = resolve_access_token(inbox)
     unless access_token.present?
       return render json: { error: 'inbox channel has no access_token' }, status: :unprocessable_entity
     end
@@ -59,5 +59,16 @@ class OmniAi::CommentRepliesController < ActionController::API
     actual   = request.headers['Authorization'].to_s.delete_prefix('Bearer ').strip
     return head :unauthorized unless expected.present?
     return head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(actual, expected)
+  end
+
+  def resolve_access_token(inbox)
+    channel = inbox.channel
+    return nil unless channel
+
+    if channel.respond_to?(:page_access_token)
+      channel.page_access_token
+    elsif channel.respond_to?(:access_token)
+      channel.access_token
+    end
   end
 end
