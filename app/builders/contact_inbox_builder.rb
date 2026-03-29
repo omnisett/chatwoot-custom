@@ -25,8 +25,10 @@ class ContactInboxBuilder
       SecureRandom.uuid
     when 'Channel::FacebookPage', 'Channel::Instagram'
       # Allow API-initiated conversations for Instagram/Facebook channels.
-      # Use provided source_id, contact identifier, or generate a UUID fallback.
-      @source_id || @contact&.identifier || "api-#{SecureRandom.uuid}"
+      # Always generate a UUID — never use the contact identifier, because the identifier
+      # equals the IGSID/FBID which is already taken by the DM-webhook contact_inbox
+      # (unique index on inbox_id + source_id would cause a 422 RecordNotUnique).
+      "api-#{SecureRandom.uuid}"
     else
       raise "Unsupported operation for this channel: #{@inbox.channel_type}"
     end
@@ -104,7 +106,8 @@ class ContactInboxBuilder
   end
 
   def allowed_channels?
-    @inbox.email? || @inbox.sms? || @inbox.twilio? || @inbox.whatsapp?
+    @inbox.email? || @inbox.sms? || @inbox.twilio? || @inbox.whatsapp? ||
+      @inbox.instagram? || @inbox.facebook?
   end
 end
 
