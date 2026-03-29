@@ -23,6 +23,10 @@ class ContactInboxBuilder
       phone_source_id
     when 'Channel::Api', 'Channel::WebWidget'
       SecureRandom.uuid
+    when 'Channel::FacebookPage', 'Channel::Instagram'
+      # Allow API-initiated conversations for Instagram/Facebook channels.
+      # Use provided source_id, contact identifier, or generate a UUID fallback.
+      @source_id || @contact&.identifier || "api-#{SecureRandom.uuid}"
     else
       raise "Unsupported operation for this channel: #{@inbox.channel_type}"
     end

@@ -14,7 +14,7 @@ class Instagram::MessageText < Instagram::BaseMessageText
 
     return process_successful_response(response) if response.success?
 
-    handle_error_response(response, ig_scope_id) || {}
+    handle_error_response(response, ig_scope_id) || { 'id' => ig_scope_id, 'name' => "Instagram User (#{ig_scope_id})" }.with_indifferent_access
   end
 
   private

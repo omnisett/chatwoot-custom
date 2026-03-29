@@ -15,10 +15,19 @@ class Instagram::WebhooksBaseService
     @contact_inbox = @inbox.contact_inboxes.where(source_id: user['id']).first
     @contact = @contact_inbox.contact if @contact_inbox
 
-    update_instagram_profile_link(user) && return if @contact
+    if @contact
+      # Update contact name if it's still a Haikunator-generated name or generic placeholder
+      # and we now have real user data from Instagram API
+      if user['name'].present? && (@contact.name.blank? || @contact.name.match?(/^(Instagram User|Unknown)/) ||
+         @contact.name.match?(/\A[a-z]+-[a-z]+-\d+\z/))
+        @contact.update!(name: user['username'].presence || user['name'])
+      end
+      update_instagram_profile_link(user)
+      return
+    end
 
     @contact_inbox = @inbox.channel.create_contact_inbox(
-      user['id'], user['name']
+      user['id'], user['username'].presence || user['name']
     )
 
     @contact = @contact_inbox.contact

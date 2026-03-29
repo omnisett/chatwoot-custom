@@ -21,6 +21,9 @@ class Instagram::BaseMessageText < Instagram::WebhooksBaseService
 
     ensure_contact(contact_id) if contacts_first_message?(contact_id)
 
+    # Retry profile fetch if contact still has a placeholder name (Haikunator or generic)
+    retry_profile_fetch(contact_id) if @contact_inbox.present? && contact_needs_name_update?
+
     create_message
   end
 
@@ -46,6 +49,21 @@ class Instagram::BaseMessageText < Instagram::WebhooksBaseService
   def contacts_first_message?(ig_scope_id)
     @contact_inbox = @inbox.contact_inboxes.where(source_id: ig_scope_id).last
     @contact_inbox.blank? && @inbox.channel.instagram_id.present?
+  end
+
+  def contact_needs_name_update?
+    return false unless @contact_inbox&.contact
+
+    name = @contact_inbox.contact.name.to_s
+    name.blank? || name.match?(/\A[a-z]+-[a-z]+-\d+\z/) || name.start_with?('Instagram User', 'Unknown')
+  end
+
+  def retry_profile_fetch(ig_scope_id)
+    return unless respond_to?(:ensure_contact, true)
+
+    ensure_contact(ig_scope_id)
+  rescue StandardError => e
+    Rails.logger.warn("[InstagramRetryProfileFetch] Failed for #{ig_scope_id}: #{e.message}")
   end
 
   def unsend_message
