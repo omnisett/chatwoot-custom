@@ -342,6 +342,15 @@ Rails.application.routes.draw do
           end
           resources :working_hours, only: [:update]
 
+          resources :comment_posts, only: [:index, :show] do
+            member do
+              post :upsert
+            end
+            collection do
+              post :upsert
+            end
+          end
+
           resources :portals do
             member do
               patch :archive

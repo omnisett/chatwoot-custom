@@ -19,6 +19,10 @@
       "unassigned": "Unassigned",
       "all": "All"
     },
+    "VIEW_MODE": {
+      "CONVERSATIONS": "All",
+      "BY_POSTS": "By Posts"
+    },
     "CHAT_STATUS_FILTER_ITEMS": {
       "open": {
         "TEXT": "Open"
