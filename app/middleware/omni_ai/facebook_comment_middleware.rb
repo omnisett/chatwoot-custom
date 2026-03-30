@@ -40,6 +40,13 @@ module OmniAi
               Rails.logger.info("[OmniAi] Forwarded Facebook comment webhook (page_id=#{page_id})")
             elsif payload[:object] == 'page'
               fields = payload[:entry]&.flat_map { |e| (e[:changes] || e['changes'] || []).map { |c| c[:field] || c['field'] } }
+              # Debug: log full changes to see item/verb values
+              payload[:entry]&.each do |entry|
+                (entry[:changes] || entry['changes'] || []).each do |change|
+                  value = change[:value] || change['value'] || {}
+                  Rails.logger.info("[OmniAi::FB] feed change detail — field=#{change[:field]||change['field']} item=#{value[:item]||value['item']} verb=#{value[:verb]||value['verb']} keys=#{value.keys}")
+                end
+              end
               Rails.logger.info("[OmniAi::FB] Page webhook but not a comment. Fields: #{fields}")
             end
           rescue JSON::ParserError => e
