@@ -29,6 +29,7 @@ module OmniAi
         if body.present?
           begin
             payload = JSON.parse(body).with_indifferent_access
+            Rails.logger.info("[OmniAi::FB][DEBUG] RAW PAYLOAD: #{body}")
             Rails.logger.info("[OmniAi::FB] POST /bot received, object=#{payload[:object]}, entries=#{payload[:entry]&.size}")
             if payload[:object] == 'page' && comment_entries?(payload[:entry])
               page_id = payload[:entry]&.first&.dig(:id)
@@ -41,9 +42,11 @@ module OmniAi
             elsif payload[:object] == 'page'
               fields = payload[:entry]&.flat_map { |e| (e[:changes] || e['changes'] || []).map { |c| c[:field] || c['field'] } }
               # Debug: log full changes to see item/verb values
-              payload[:entry]&.each do |entry|
-                (entry[:changes] || entry['changes'] || []).each do |change|
+              payload[:entry]&.each_with_index do |entry, idx|
+                Rails.logger.info("[OmniAi::FB][DEBUG] ENTRY[#{idx}]: #{entry}")
+                (entry[:changes] || entry['changes'] || []).each_with_index do |change, cidx|
                   value = change[:value] || change['value'] || {}
+                  Rails.logger.info("[OmniAi::FB][DEBUG] ENTRY[#{idx}].CHANGE[#{cidx}]: #{change}")
                   Rails.logger.info("[OmniAi::FB] feed change detail — field=#{change[:field]||change['field']} item=#{value[:item]||value['item']} verb=#{value[:verb]||value['verb']} keys=#{value.keys}")
                 end
               end
