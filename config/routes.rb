@@ -368,6 +368,16 @@ Rails.application.routes.draw do
 
           resources :upload, only: [:create]
         end
+
+        # Omni-AI Comments Page proxy (authenticated via Chatwoot session)
+        get  'omni_ai/comments_page/stats',                    to: '/omni_ai/comments_proxy#stats'
+        get  'omni_ai/comments_page/by-post',                  to: '/omni_ai/comments_proxy#by_post'
+        get  'omni_ai/comments_page/post/:post_id',            to: '/omni_ai/comments_proxy#post_comments'
+        get  'omni_ai/comments_page/post-info/:post_id',       to: '/omni_ai/comments_proxy#post_info'
+        get  'omni_ai/comments_page/commenter/:commenter_id',  to: '/omni_ai/comments_proxy#commenter_history'
+        put  'omni_ai/comments_page/:id/reply',                to: '/omni_ai/comments_proxy#reply'
+        post 'omni_ai/comments_page/:comment_id/dm',           to: '/omni_ai/comments_proxy#send_dm'
+        get  'omni_ai/comments_page',                          to: '/omni_ai/comments_proxy#index'
       end
       # end of account scoped api routes
       # ----------------------------------
@@ -436,15 +446,6 @@ Rails.application.routes.draw do
       post 'omni_ai/private_reply', to: '/omni_ai/private_replies#create'
       get  'omni_ai/post_info',     to: '/omni_ai/post_info#show'
 
-      # Omni-AI Comments Page proxy (authenticated via Chatwoot session)
-      get  'omni_ai/comments_page/stats',                    to: '/omni_ai/comments_proxy#stats'
-      get  'omni_ai/comments_page/by-post',                  to: '/omni_ai/comments_proxy#by_post'
-      get  'omni_ai/comments_page/post/:post_id',            to: '/omni_ai/comments_proxy#post_comments'
-      get  'omni_ai/comments_page/post-info/:post_id',       to: '/omni_ai/comments_proxy#post_info'
-      get  'omni_ai/comments_page/commenter/:commenter_id',  to: '/omni_ai/comments_proxy#commenter_history'
-      put  'omni_ai/comments_page/:id/reply',                to: '/omni_ai/comments_proxy#reply'
-      post 'omni_ai/comments_page/:comment_id/dm',           to: '/omni_ai/comments_proxy#send_dm'
-      get  'omni_ai/comments_page',                          to: '/omni_ai/comments_proxy#index'
     end
 
     namespace :v2 do
