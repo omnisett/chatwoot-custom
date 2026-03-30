@@ -41,7 +41,7 @@ class OmniAi::PostInfoController < ActionController::API
   private
 
   def fetch_facebook_post(post_id, access_token)
-    fields = 'message,full_picture,permalink_url,created_time,type,status_type'
+    fields = 'message,full_picture,permalink_url,created_time'
     response = HTTParty.get(
       "#{FB_GRAPH_BASE}/#{post_id}",
       query: { fields: fields, access_token: access_token }
@@ -61,9 +61,7 @@ class OmniAi::PostInfoController < ActionController::API
         message: data['message'],
         picture: data['full_picture'],
         permalink: permalink,
-        created_time: data['created_time'],
-        post_type: data['type'],
-        status_type: data['status_type']
+        created_time: data['created_time']
       }, status: :ok
     else
       Rails.logger.warn("[OmniAi::PostInfo] FB Graph error for #{post_id}: #{response.code} #{response.body}")
