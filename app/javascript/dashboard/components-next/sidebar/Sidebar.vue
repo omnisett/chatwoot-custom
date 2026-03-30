@@ -47,6 +47,8 @@ const isACustomBrandedInstance = useMapGetter(
   'globalConfig/isACustomBrandedInstance'
 );
 const isRTL = useMapGetter('accounts/isRTL');
+const currentUser = useMapGetter('getCurrentUser');
+const globalConfig = useMapGetter('globalConfig/get');
 
 const { width: windowWidth } = useWindowSize();
 const isMobile = computed(() => windowWidth.value < 768);
@@ -61,6 +63,15 @@ const hasAdvancedAssignment = computed(() => {
     accountId.value,
     FEATURE_FLAGS.ADVANCED_ASSIGNMENT
   );
+});
+
+const showOmniComments = computed(() => {
+  const cfg = globalConfig.value || {};
+  if (!cfg.omniCommentsPageEnabled) return false;
+  const allowedIds = (cfg.omniCommentsPageUserIds || '').trim();
+  if (allowedIds.toUpperCase() === 'ALL') return true;
+  const ids = allowedIds.split(',').map(id => Number(id.trim()));
+  return ids.includes(currentUser.value?.id);
 });
 
 const toggleShortcutModalFn = show => {
@@ -466,6 +477,17 @@ const menuItems = computed(() => {
         },
       ],
     },
+    ...(showOmniComments.value
+      ? [
+          {
+            name: 'OmniComments',
+            label: t('SIDEBAR.OMNI_COMMENTS'),
+            icon: 'i-lucide-message-square-text',
+            to: accountScopedRoute('omni_comments_index'),
+            activeOn: ['omni_comments_index'],
+          },
+        ]
+      : []),
     {
       name: 'Reports',
       label: t('SIDEBAR.REPORTS'),

@@ -80,7 +80,9 @@ class DashboardController < ActionController::Base
       IS_ENTERPRISE: ChatwootApp.enterprise?,
       AZURE_APP_ID: GlobalConfigService.load('AZURE_APP_ID', ''),
       GIT_SHA: GIT_HASH,
-      ALLOWED_LOGIN_METHODS: allowed_login_methods
+      ALLOWED_LOGIN_METHODS: allowed_login_methods,
+      OMNI_COMMENTS_PAGE_ENABLED: ENV.fetch('OMNI_COMMENTS_PAGE_ENABLED', 'false'),
+      OMNI_COMMENTS_PAGE_USER_IDS: ENV.fetch('OMNI_COMMENTS_PAGE_USER_IDS', '')
     }
   end
 

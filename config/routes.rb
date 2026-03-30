@@ -435,6 +435,18 @@ Rails.application.routes.draw do
       post 'omni_ai/comment_reply', to: '/omni_ai/comment_replies#create'
       post 'omni_ai/private_reply', to: '/omni_ai/private_replies#create'
       get  'omni_ai/post_info',     to: '/omni_ai/post_info#show'
+
+      # Omni-AI Comments Page proxy (authenticated via Chatwoot session)
+      scope 'omni_ai/comments_page' do
+        get  'stats',                    to: '/omni_ai/comments_proxy#stats'
+        get  'by-post',                  to: '/omni_ai/comments_proxy#by_post'
+        get  'post/:post_id',            to: '/omni_ai/comments_proxy#post_comments'
+        get  'post-info/:post_id',       to: '/omni_ai/comments_proxy#post_info'
+        get  'commenter/:commenter_id',  to: '/omni_ai/comments_proxy#commenter_history'
+        put  ':id/reply',                to: '/omni_ai/comments_proxy#reply'
+        post ':comment_id/dm',           to: '/omni_ai/comments_proxy#send_dm'
+        get  '',                         to: '/omni_ai/comments_proxy#index'
+      end
     end
 
     namespace :v2 do
