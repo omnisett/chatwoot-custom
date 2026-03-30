@@ -433,6 +433,7 @@ Rails.application.routes.draw do
         end
       end
       post 'omni_ai/comment_reply', to: '/omni_ai/comment_replies#create'
+      post 'omni_ai/private_reply', to: '/omni_ai/private_replies#create'
     end
 
     namespace :v2 do
