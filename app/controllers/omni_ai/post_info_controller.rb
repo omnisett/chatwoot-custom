@@ -49,12 +49,18 @@ class OmniAi::PostInfoController < ActionController::API
 
     if response.success?
       data = response.parsed_response
+      # Fallback permalink: construct from post_id if Graph API didn't return one
+      permalink = data['permalink_url']
+      if permalink.blank? && post_id.include?('_')
+        page_id, story_id = post_id.split('_', 2)
+        permalink = "https://www.facebook.com/#{page_id}/posts/#{story_id}"
+      end
       render json: {
         post_id: post_id,
         platform: 'facebook',
         message: data['message'],
         picture: data['full_picture'],
-        permalink: data['permalink_url'],
+        permalink: permalink,
         created_time: data['created_time'],
         post_type: data['type'],
         status_type: data['status_type']
