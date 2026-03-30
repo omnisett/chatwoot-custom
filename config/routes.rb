@@ -437,16 +437,14 @@ Rails.application.routes.draw do
       get  'omni_ai/post_info',     to: '/omni_ai/post_info#show'
 
       # Omni-AI Comments Page proxy (authenticated via Chatwoot session)
-      scope 'omni_ai/comments_page' do
-        get  'stats',                    to: '/omni_ai/comments_proxy#stats'
-        get  'by-post',                  to: '/omni_ai/comments_proxy#by_post'
-        get  'post/:post_id',            to: '/omni_ai/comments_proxy#post_comments'
-        get  'post-info/:post_id',       to: '/omni_ai/comments_proxy#post_info'
-        get  'commenter/:commenter_id',  to: '/omni_ai/comments_proxy#commenter_history'
-        put  ':id/reply',                to: '/omni_ai/comments_proxy#reply'
-        post ':comment_id/dm',           to: '/omni_ai/comments_proxy#send_dm'
-        get  '',                         to: '/omni_ai/comments_proxy#index'
-      end
+      get  'omni_ai/comments_page/stats',                    to: '/omni_ai/comments_proxy#stats'
+      get  'omni_ai/comments_page/by-post',                  to: '/omni_ai/comments_proxy#by_post'
+      get  'omni_ai/comments_page/post/:post_id',            to: '/omni_ai/comments_proxy#post_comments'
+      get  'omni_ai/comments_page/post-info/:post_id',       to: '/omni_ai/comments_proxy#post_info'
+      get  'omni_ai/comments_page/commenter/:commenter_id',  to: '/omni_ai/comments_proxy#commenter_history'
+      put  'omni_ai/comments_page/:id/reply',                to: '/omni_ai/comments_proxy#reply'
+      post 'omni_ai/comments_page/:comment_id/dm',           to: '/omni_ai/comments_proxy#send_dm'
+      get  'omni_ai/comments_page',                          to: '/omni_ai/comments_proxy#index'
     end
 
     namespace :v2 do
