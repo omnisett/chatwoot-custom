@@ -121,8 +121,7 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
   def broadcast_omni_comments_update(post_id: nil)
     ActionCable.server.broadcast(
       "account_#{current_account.id}",
-      event: 'omni_comments.updated',
-      data: { post_id: post_id }.compact
+      { event: 'omni_comments.updated', data: { post_id: post_id }.compact }
     )
   rescue StandardError => e
     Rails.logger.warn("[OmniAi::CommentsProxy] broadcast error: #{e.message}")

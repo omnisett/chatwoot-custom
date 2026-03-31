@@ -62,8 +62,7 @@ module OmniAi
 
       ActionCable.server.broadcast(
         "account_#{account_id}",
-        event: 'omni_comments.updated',
-        data: {}
+        { event: 'omni_comments.updated', data: {} }
       )
     rescue StandardError => e
       Rails.logger.warn("[OmniAi::CommentForwardJob] broadcast error: #{e.message}")
