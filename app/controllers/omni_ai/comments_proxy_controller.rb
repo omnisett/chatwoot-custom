@@ -14,8 +14,7 @@
 #   POST /auth/omni_ai/comments/:commentId/dm  — trigger DM via Chatwoot channel
 #   GET  /auth/omni_ai/comments                — list all
 
-class OmniAi::CommentsProxyController < ApplicationController
-  before_action :authenticate_user!
+class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
   before_action :verify_access
 
   # Proxy GET requests to omni-ai backend
@@ -160,10 +159,6 @@ class OmniAi::CommentsProxyController < ApplicationController
 
   def permitted_query(*keys)
     params.permit(*keys).to_h.compact_blank
-  end
-
-  def current_account
-    @current_account ||= current_user.accounts.first
   end
 
   def resolve_inbox_id(platform)
