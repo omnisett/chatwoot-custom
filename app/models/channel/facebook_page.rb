@@ -65,6 +65,12 @@ class Channel::FacebookPage < ApplicationRecord
   end
 
   def unsubscribe
+    # Skip unsubscribe if another channel with the same page_id exists (inbox re-created)
+    if Channel::FacebookPage.where(page_id: page_id).where.not(id: id).exists?
+      Rails.logger.info("[FacebookPage] Skipping unsubscribe for page_id=#{page_id} — another channel exists")
+      return true
+    end
+
     Facebook::Messenger::Subscriptions.unsubscribe(access_token: page_access_token)
     Rails.logger.info("[FacebookPage] Unsubscribed page_id=#{page_id} from webhooks")
   rescue StandardError => e
