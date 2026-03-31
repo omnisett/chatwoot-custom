@@ -180,10 +180,10 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
 
   def resolve_inbox_id(platform)
     if platform == 'instagram'
-      ENV['OMNI_AI_INSTAGRAM_INBOX_ID'].presence || current_account&.inboxes&.joins(:channel)
+      ENV['OMNI_AI_INSTAGRAM_INBOX_ID'].presence || current_account&.inboxes
         &.where(channel_type: 'Channel::Instagram')&.first&.id
     else
-      ENV['OMNI_AI_FACEBOOK_INBOX_ID'].presence || current_account&.inboxes&.joins(:channel)
+      ENV['OMNI_AI_FACEBOOK_INBOX_ID'].presence || current_account&.inboxes
         &.where(channel_type: 'Channel::FacebookPage')&.first&.id
     end
   end
