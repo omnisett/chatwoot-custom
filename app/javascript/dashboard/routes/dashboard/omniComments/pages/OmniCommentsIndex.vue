@@ -749,7 +749,7 @@ watch([search, platform], () => {
                         : `Reply to ${group.name}…`"
                       @input="replyTexts[`${post.post_id}_${group.commenterId}`] = $event.target.value"
                       @keydown.enter.prevent="sendInlineReply(
-                        replyTargets[`${post.post_id}_${group.commenterId}`] || getDefaultReplyTarget(group.comments),
+                        replyTargets[`${post.post_id}_${group.commenterId}`] || getDefaultReplyTarget(visibleCommentsForGroup(group, post.post_id)),
                         `${post.post_id}_${group.commenterId}`
                       )"
                     />
@@ -761,7 +761,7 @@ watch([search, platform], () => {
                         ? 'text-n-brand hover:bg-n-alpha-2'
                         : 'text-n-slate-10 cursor-not-allowed'"
                       @click="sendInlineReply(
-                        replyTargets[`${post.post_id}_${group.commenterId}`] || getDefaultReplyTarget(group.comments),
+                        replyTargets[`${post.post_id}_${group.commenterId}`] || getDefaultReplyTarget(visibleCommentsForGroup(group, post.post_id)),
                         `${post.post_id}_${group.commenterId}`
                       )"
                     >
