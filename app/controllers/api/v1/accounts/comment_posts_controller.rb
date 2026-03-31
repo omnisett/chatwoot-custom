@@ -42,6 +42,12 @@ class Api::V1::Accounts::CommentPostsController < Api::V1::Accounts::BaseControl
     post.last_comment_at = Time.current
     post.conversations_count = (post.conversations_count || 0) + 1 if post.new_record? || params[:increment_count]
 
+    # Auto-resolve inbox_id if not provided (e.g. after inbox was deleted and re-created)
+    if post.inbox_id.blank? && post.platform.present?
+      resolved = post.resolved_inbox
+      post.inbox_id = resolved.id if resolved
+    end
+
     # Fetch metadata from Graph API server-side if not provided and post_text is blank
     fetch_post_metadata_from_graph(post) if post.post_text.blank? && post.post_id.present?
 
@@ -67,7 +73,7 @@ class Api::V1::Accounts::CommentPostsController < Api::V1::Accounts::BaseControl
   end
 
   def fetch_post_metadata_from_graph(post)
-    inbox = post.inbox_id.present? ? Inbox.find_by(id: post.inbox_id) : nil
+    inbox = post.resolved_inbox
     return unless inbox
 
     token = resolve_channel_token(inbox)

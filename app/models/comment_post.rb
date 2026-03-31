@@ -6,7 +6,7 @@
 #
 #  id                  :bigint           not null, primary key
 #  account_id          :bigint           not null
-#  inbox_id            :bigint           not null
+#  inbox_id            :bigint
 #  platform            :string           not null
 #  post_id             :string           not null
 #  page_id             :string
@@ -22,7 +22,7 @@
 #
 class CommentPost < ApplicationRecord
   belongs_to :account
-  belongs_to :inbox
+  belongs_to :inbox, optional: true
 
   validates :post_id, presence: true, uniqueness: { scope: :account_id }
   validates :platform, presence: true, inclusion: { in: %w[facebook instagram] }
@@ -31,6 +31,21 @@ class CommentPost < ApplicationRecord
   scope :ordered_by_post_date, -> { order(post_created_at: :desc) }
   scope :for_platform, ->(platform) { where(platform: platform) if platform.present? }
   scope :for_inbox, ->(inbox_id) { where(inbox_id: inbox_id) if inbox_id.present? }
+
+  # Dynamically resolve the current inbox for this platform (handles inbox deletion/re-creation)
+  def resolved_inbox
+    return inbox if inbox.present?
+
+    resolved = if platform == 'instagram'
+                 account.inboxes.where(channel_type: 'Channel::Instagram').first
+               else
+                 account.inboxes.where(channel_type: 'Channel::FacebookPage').first
+               end
+
+    # Re-link if found
+    update_column(:inbox_id, resolved.id) if resolved
+    resolved
+  end
 
   # Find conversations that belong to this post via additional_attributes.post_id
   def conversations
