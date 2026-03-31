@@ -19,32 +19,32 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
 
   # Proxy GET requests to omni-ai backend
   def stats
-    proxy_get('/api/comments/stats')
+    proxy_get('/api/internal/comments/stats')
   end
 
   def by_post
-    proxy_get('/api/comments/by-post', permitted_query(:platform, :q))
+    proxy_get('/api/internal/comments/by-post', permitted_query(:platform, :q))
   end
 
   def post_comments
-    proxy_get("/api/comments/post/#{encoded_param(:post_id)}")
+    proxy_get("/api/internal/comments/post/#{encoded_param(:post_id)}")
   end
 
   def post_info
-    proxy_get("/api/comments/post-info/#{encoded_param(:post_id)}", permitted_query(:platform))
+    proxy_get("/api/internal/comments/post-info/#{encoded_param(:post_id)}", permitted_query(:platform))
   end
 
   def index
-    proxy_get('/api/comments', permitted_query(:platform, :status, :q, :limit))
+    proxy_get('/api/internal/comments', permitted_query(:platform, :status, :q, :limit))
   end
 
   def commenter_history
-    proxy_get("/api/comments/commenter/#{encoded_param(:commenter_id)}")
+    proxy_get("/api/internal/comments/commenter/#{encoded_param(:commenter_id)}")
   end
 
   # Proxy PUT reply
   def reply
-    proxy_put("/api/comments/#{encoded_param(:id)}/reply", { reply: params[:reply] })
+    proxy_put("/api/internal/comments/#{encoded_param(:id)}/reply", { reply: params[:reply] })
   end
 
   # DM flow: create/find contact, send message through Chatwoot channel
@@ -56,7 +56,7 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
     return render json: { error: 'dm_text required' }, status: :bad_request if dm_text.blank?
 
     # Fetch comment details from omni-ai to get commenter info
-    comment_res = fetch_from_omni("/api/comments/#{ERB::Util.url_encode(comment_id)}")
+    comment_res = fetch_from_omni("/api/internal/comments/#{ERB::Util.url_encode(comment_id)}")
     return render json: { error: 'comment_not_found' }, status: :not_found unless comment_res
 
     commenter_id = comment_res['commenter_id']
@@ -85,7 +85,7 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
     )
 
     # Update omni-ai backend with DM info
-    proxy_put("/api/comments/#{ERB::Util.url_encode(comment_id)}/dm", {
+    proxy_put("/api/internal/comments/#{ERB::Util.url_encode(comment_id)}/dm", {
       dm_text: dm_text,
       dm_conversation_id: conversation.display_id.to_s,
       dm_message_id: outgoing.id.to_s,
