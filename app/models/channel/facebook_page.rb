@@ -49,21 +49,24 @@ class Channel::FacebookPage < ApplicationRecord
 
   def subscribe
     # ref https://developers.facebook.com/docs/messenger-platform/reference/webhook-events
-    Facebook::Messenger::Subscriptions.subscribe(
+    result = Facebook::Messenger::Subscriptions.subscribe(
       access_token: page_access_token,
       subscribed_fields: %w[
         feed messages message_deliveries message_echoes message_reads standby messaging_handovers
       ]
     )
+    Rails.logger.info("[FacebookPage] Subscribed page_id=#{page_id} to webhooks: #{result}")
+    result
   rescue StandardError => e
-    Rails.logger.debug { "Rescued: #{e.inspect}" }
+    Rails.logger.error("[FacebookPage] Failed to subscribe page_id=#{page_id}: #{e.class} — #{e.message}")
     true
   end
 
   def unsubscribe
     Facebook::Messenger::Subscriptions.unsubscribe(access_token: page_access_token)
+    Rails.logger.info("[FacebookPage] Unsubscribed page_id=#{page_id} from webhooks")
   rescue StandardError => e
-    Rails.logger.debug { "Rescued: #{e.inspect}" }
+    Rails.logger.error("[FacebookPage] Failed to unsubscribe page_id=#{page_id}: #{e.class} — #{e.message}")
     true
   end
 end
