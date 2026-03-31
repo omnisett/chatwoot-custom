@@ -45,10 +45,23 @@ class OmniAi::PrivateRepliesController < ActionController::API
 
     channel = inbox.channel
     page_id = channel.respond_to?(:page_id) ? channel.page_id : nil
+    instagram_id = channel.respond_to?(:instagram_id) ? channel.instagram_id : nil
 
     # ── Step 1: Send Private Reply via Meta API ──
-    graph_base = platform == 'instagram' ? IG_GRAPH_BASE : FB_GRAPH_BASE
-    target_id = page_id || inbox_id
+    # Instagram Private Replies use IG Graph API with the Instagram Business Account ID
+    # Facebook Private Replies use FB Graph API with the Page ID
+    if platform == 'instagram'
+      graph_base = IG_GRAPH_BASE
+      target_id = instagram_id || page_id
+    else
+      graph_base = FB_GRAPH_BASE
+      target_id = page_id
+    end
+
+    unless target_id.present?
+      return render json: { error: "no #{platform == 'instagram' ? 'instagram_id' : 'page_id'} for this channel" },
+                    status: :unprocessable_entity
+    end
 
     private_reply_response = HTTParty.post(
       "#{graph_base}/#{target_id}/messages",
