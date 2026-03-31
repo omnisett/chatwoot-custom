@@ -59,6 +59,8 @@ class Channel::FacebookPage < ApplicationRecord
     result
   rescue StandardError => e
     Rails.logger.error("[FacebookPage] Failed to subscribe page_id=#{page_id}: #{e.class} — #{e.message}")
+    # Retry once after 5 seconds in a background job
+    Channels::Facebook::ResubscribeJob.perform_later(id) if persisted?
     true
   end
 
