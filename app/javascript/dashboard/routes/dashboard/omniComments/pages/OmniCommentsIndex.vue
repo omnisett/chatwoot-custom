@@ -53,6 +53,41 @@ const detailCommenterHistory = ref([]);
 const detailPostInfo = ref(null);
 const detailManualReply = ref('');
 const detailReplyLoading = ref(false);
+const detailHistoryVisible = ref(5);
+
+// Collapsible commenter groups: tracks how many comments to show per group
+// key = `${postId}_${commenterId}`, value = number of visible comments
+const COMMENTS_INITIAL = 2;
+const COMMENTS_STEP = 5;
+const groupVisibleCount = ref({});
+
+function visibleCommentsForGroup(group, postId) {
+  const key = `${postId}_${group.commenterId}`;
+  const limit = groupVisibleCount.value[key] || COMMENTS_INITIAL;
+  // Show the LAST N comments (most recent)
+  return group.comments.slice(-limit);
+}
+function hiddenCount(group, postId) {
+  const key = `${postId}_${group.commenterId}`;
+  const limit = groupVisibleCount.value[key] || COMMENTS_INITIAL;
+  return Math.max(0, group.comments.length - limit);
+}
+function showMore(group, postId) {
+  const key = `${postId}_${group.commenterId}`;
+  const current = groupVisibleCount.value[key] || COMMENTS_INITIAL;
+  groupVisibleCount.value = { ...groupVisibleCount.value, [key]: current + COMMENTS_STEP };
+}
+function collapseGroup(group, postId) {
+  const key = `${postId}_${group.commenterId}`;
+  groupVisibleCount.value = { ...groupVisibleCount.value, [key]: COMMENTS_INITIAL };
+}
+function isGroupExpanded(group, postId) {
+  const key = `${postId}_${group.commenterId}`;
+  return (groupVisibleCount.value[key] || COMMENTS_INITIAL) > COMMENTS_INITIAL;
+}
+function showMoreDetailHistory() {
+  detailHistoryVisible.value += 5;
+}
 
 /* ── KPI definitions ── */
 const kpis = computed(() => [
@@ -168,6 +203,7 @@ async function openDetailModal(comment) {
   detailReplyLoading.value = false;
   detailCommenterHistory.value = [];
   detailPostInfo.value = null;
+  detailHistoryVisible.value = 5;
   nextTick(() => detailDialogRef.value?.open());
   // Fetch commenter history
   if (comment.commenter_id) {
@@ -307,24 +343,45 @@ function parseReplyHistory(comment) {
 }
 
 /* ── Lifecycle ── */
+import { onUnmounted } from 'vue';
+import { emitter } from 'shared/helpers/mitt';
+
 onMounted(() => {
   fetchStats();
   fetchPosts();
 });
 
-// Auto-refresh
-let refreshInterval;
-onMounted(() => {
-  refreshInterval = setInterval(() => {
-    fetchStats();
+// WebSocket-driven updates: listen for omni_comments:updated events
+function onOmniCommentsUpdated(data) {
+  fetchStats();
+  if (data?.post_id) {
+    // Refresh only the affected post's comments if expanded
+    if (expandedPostIds.value.has(data.post_id)) {
+      fetchPostComments(data.post_id);
+    }
+    // Also refresh post list to update counts
     fetchPosts();
-  }, 30000);
+  } else {
+    fetchPosts();
+  }
+}
+onMounted(() => {
+  emitter.on('omni_comments:updated', onOmniCommentsUpdated);
+});
+onUnmounted(() => {
+  emitter.off('omni_comments:updated', onOmniCommentsUpdated);
 });
 
-// Cleanup
-import { onUnmounted } from 'vue';
+// Soft fallback polling every 5 minutes (in case WebSocket event missed)
+let fallbackInterval;
+onMounted(() => {
+  fallbackInterval = setInterval(() => {
+    fetchStats();
+    fetchPosts();
+  }, 300000);
+});
 onUnmounted(() => {
-  if (refreshInterval) clearInterval(refreshInterval);
+  if (fallbackInterval) clearInterval(fallbackInterval);
 });
 
 // Re-fetch on filter change
@@ -569,10 +626,23 @@ watch([search, platform], () => {
                   </span>
                 </div>
 
-                <!-- Comments -->
+                <!-- "Show N earlier" button -->
+                <div v-if="hiddenCount(group, post.post_id) > 0" class="px-3 pt-1">
+                  <button
+                    type="button"
+                    class="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-medium text-n-brand hover:bg-n-alpha-2 transition-colors"
+                    @click="showMore(group, post.post_id)"
+                  >
+                    <span class="i-lucide-chevrons-up w-3 h-3" />
+                    Show {{ Math.min(hiddenCount(group, post.post_id), COMMENTS_STEP) }} earlier
+                    <span class="text-n-slate-10 font-normal">({{ hiddenCount(group, post.post_id) }} hidden)</span>
+                  </button>
+                </div>
+
+                <!-- Comments (only visible slice) -->
                 <div class="px-3 pb-1 space-y-0.5">
                   <div
-                    v-for="c in group.comments"
+                    v-for="c in visibleCommentsForGroup(group, post.post_id)"
                     :key="c.id"
                   >
                     <!-- User comment -->
@@ -653,6 +723,18 @@ watch([search, platform], () => {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                <!-- Collapse button (when expanded beyond default) -->
+                <div v-if="isGroupExpanded(group, post.post_id)" class="px-3 pt-0.5">
+                  <button
+                    type="button"
+                    class="w-full flex items-center justify-center gap-1.5 py-1 rounded-lg text-[11px] font-medium text-n-slate-10 hover:text-n-slate-12 hover:bg-n-alpha-2 transition-colors"
+                    @click="collapseGroup(group, post.post_id)"
+                  >
+                    <span class="i-lucide-chevrons-down w-3 h-3" />
+                    Collapse
+                  </button>
                 </div>
 
                 <!-- Inline reply input -->
@@ -890,9 +972,9 @@ watch([search, platform], () => {
             <span class="i-lucide-repeat-2 w-3.5 h-3.5" />
             Other comments by this user ({{ detailCommenterHistory.filter(x => x.id !== detailComment.id).length }})
           </p>
-          <div class="space-y-1.5 max-h-32 overflow-y-auto">
+          <div class="space-y-1.5 max-h-48 overflow-y-auto">
             <div
-              v-for="oc in detailCommenterHistory.filter(x => x.id !== detailComment.id).slice(0, 5)"
+              v-for="oc in detailCommenterHistory.filter(x => x.id !== detailComment.id).slice(0, detailHistoryVisible)"
               :key="oc.id"
               class="text-xs p-2 rounded-lg bg-n-alpha-1 flex items-start gap-2"
             >
@@ -905,12 +987,15 @@ watch([search, platform], () => {
               <p class="text-n-slate-11 line-clamp-1 flex-1">{{ oc.comment_text }}</p>
               <span class="text-n-slate-10 shrink-0">{{ formatDate(oc.created_at) }}</span>
             </div>
-            <p
-              v-if="detailCommenterHistory.filter(x => x.id !== detailComment.id).length > 5"
-              class="text-[10px] text-n-slate-10 text-center"
+            <button
+              v-if="detailCommenterHistory.filter(x => x.id !== detailComment.id).length > detailHistoryVisible"
+              type="button"
+              class="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-medium text-n-brand hover:bg-n-alpha-2 transition-colors"
+              @click="showMoreDetailHistory()"
             >
-              +{{ detailCommenterHistory.filter(x => x.id !== detailComment.id).length - 5 }} more
-            </p>
+              <span class="i-lucide-chevrons-down w-3 h-3" />
+              Show {{ Math.min(detailCommenterHistory.filter(x => x.id !== detailComment.id).length - detailHistoryVisible, 5) }} more
+            </button>
           </div>
         </div>
 

@@ -45,6 +45,7 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
   # Proxy PUT reply
   def reply
     proxy_put("/api/internal/comments/#{encoded_param(:id)}/reply", { reply: params[:reply] })
+    broadcast_omni_comments_update
   end
 
   # DM flow: create/find contact, send message through Chatwoot channel
@@ -92,6 +93,8 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
       dm_contact_id: contact_inbox.contact_id.to_s
     })
 
+    broadcast_omni_comments_update
+
     render json: {
       success: true,
       conversation_id: conversation.display_id,
@@ -113,6 +116,16 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
 
     ids = allowed_ids.split(',').map(&:strip).map(&:to_i)
     head :forbidden unless ids.include?(current_user.id)
+  end
+
+  def broadcast_omni_comments_update(post_id: nil)
+    ActionCable.server.broadcast(
+      "account_#{current_account.id}",
+      event: 'omni_comments.updated',
+      data: { post_id: post_id }.compact
+    )
+  rescue StandardError => e
+    Rails.logger.warn("[OmniAi::CommentsProxy] broadcast error: #{e.message}")
   end
 
   def omni_ai_base_url

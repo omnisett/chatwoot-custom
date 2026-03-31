@@ -49,6 +49,35 @@ module OmniAi
       Rails.logger.info(
         "[OmniAi::CommentForwardJob] Forwarded #{platform} comments (#{entries&.length || 0} entries) → HTTP #{response.code}"
       )
+
+      # Broadcast WebSocket event so the Comments page refreshes
+      broadcast_comments_update(platform, page_id, instagram_id)
+    end
+
+    private
+
+    def broadcast_comments_update(platform, page_id, instagram_id)
+      account_id = resolve_account_id(platform, page_id, instagram_id)
+      return unless account_id
+
+      ActionCable.server.broadcast(
+        "account_#{account_id}",
+        event: 'omni_comments.updated',
+        data: {}
+      )
+    rescue StandardError => e
+      Rails.logger.warn("[OmniAi::CommentForwardJob] broadcast error: #{e.message}")
+    end
+
+    def resolve_account_id(platform, page_id, instagram_id)
+      channel = if platform == 'instagram' && instagram_id.present?
+                  Channel::FacebookPage.find_by(instagram_id: instagram_id)
+                elsif page_id.present?
+                  Channel::FacebookPage.find_by(page_id: page_id)
+                end
+      channel&.account_id
+    rescue StandardError
+      nil
     end
   end
 end
