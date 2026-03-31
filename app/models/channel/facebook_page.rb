@@ -31,7 +31,7 @@ class Channel::FacebookPage < ApplicationRecord
 
   validates :page_id, uniqueness: { scope: :account_id }
 
-  after_create_commit :subscribe
+  after_create_commit :schedule_subscribe
   after_update_commit :subscribe, if: :saved_change_to_page_access_token?
   before_destroy :unsubscribe
 
@@ -45,6 +45,16 @@ class Channel::FacebookPage < ApplicationRecord
                                                             inbox: inbox,
                                                             contact_attributes: { name: name }
                                                           }).perform
+  end
+
+  # Schedule subscribe via background job with delay to avoid race conditions
+  # (e.g. old inbox's DeleteObjectJob may unsubscribe after new one subscribes)
+  def schedule_subscribe
+    Channels::Facebook::ResubscribeJob.set(wait: 5.seconds).perform_later(id)
+    Rails.logger.info("[FacebookPage] Scheduled subscribe for page_id=#{page_id} (channel_id=#{id}) in 5s")
+  rescue StandardError => e
+    Rails.logger.error("[FacebookPage] Failed to schedule subscribe for page_id=#{page_id}: #{e.class} — #{e.message}")
+    subscribe # Fallback: try inline
   end
 
   def subscribe
