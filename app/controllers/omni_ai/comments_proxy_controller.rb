@@ -125,7 +125,9 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
 
   def proxy_get(path, query_params = {})
     url = "#{omni_ai_base_url}#{path}"
+    Rails.logger.info("[OmniAi::CommentsProxy] → GET #{url}")
     response = HTTParty.get(url, query: query_params, headers: auth_headers, timeout: 15)
+    Rails.logger.info("[OmniAi::CommentsProxy] ← #{response.code} #{response.body&.truncate(500)}")
     render json: response.parsed_response, status: response.code
   rescue StandardError => e
     Rails.logger.error("[OmniAi::CommentsProxy] GET #{path} error: #{e.message}")
@@ -134,7 +136,9 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
 
   def proxy_put(path, body = {})
     url = "#{omni_ai_base_url}#{path}"
+    Rails.logger.info("[OmniAi::CommentsProxy] → PUT #{url}")
     response = HTTParty.put(url, body: body.to_json, headers: auth_headers.merge('Content-Type' => 'application/json'), timeout: 15)
+    Rails.logger.info("[OmniAi::CommentsProxy] ← #{response.code} #{response.body&.truncate(500)}")
     render json: response.parsed_response, status: response.code
   rescue StandardError => e
     Rails.logger.error("[OmniAi::CommentsProxy] PUT #{path} error: #{e.message}")
