@@ -125,7 +125,8 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
 
   def proxy_get(path, query_params = {})
     url = "#{omni_ai_base_url}#{path}"
-    Rails.logger.info("[OmniAi::CommentsProxy] → GET #{url}")
+    tok = omni_ai_token
+    Rails.logger.info("[OmniAi::CommentsProxy] → GET #{url} | token_length=#{tok.length} first4=#{tok[0..3]}")
     response = HTTParty.get(url, query: query_params, headers: auth_headers, timeout: 15)
     Rails.logger.info("[OmniAi::CommentsProxy] ← #{response.code} #{response.body&.truncate(500)}")
     render json: response.parsed_response, status: response.code
