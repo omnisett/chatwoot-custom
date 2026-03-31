@@ -60,45 +60,91 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
     comment_res = fetch_from_omni("/api/internal/comments/#{ERB::Util.url_encode(comment_id)}")
     return render json: { error: 'comment_not_found' }, status: :not_found unless comment_res
 
+    fb_comment_id = comment_res['comment_id']
     commenter_id = comment_res['commenter_id']
     commenter_name = comment_res['commenter_name'] || comment_res['commenter_username'] || 'User'
 
-    # Use the private_reply flow (reuse existing OmniAi controller logic)
+    return render json: { error: 'no_facebook_comment_id' }, status: :unprocessable_entity if fb_comment_id.blank?
+
+    # Use Private Reply API (7-day window) instead of standard Messenger DM (24h window)
     inbox_id = resolve_inbox_id(platform)
     return render json: { error: 'no_inbox_configured' }, status: :unprocessable_entity unless inbox_id
 
     inbox = Inbox.find_by(id: inbox_id)
     return render json: { error: 'inbox_not_found' }, status: :not_found unless inbox
 
-    # Find or create contact
-    contact_inbox = find_or_create_contact(inbox, commenter_id, commenter_name, platform)
-    return render json: { error: 'contact_creation_failed' }, status: :unprocessable_entity unless contact_inbox
+    access_token = resolve_access_token(inbox)
+    return render json: { error: 'no_access_token' }, status: :unprocessable_entity unless access_token.present?
 
-    # Find or create conversation, then send message
-    conversation = find_or_create_conversation(contact_inbox, inbox)
+    channel = inbox.channel
+    page_id = channel.respond_to?(:page_id) ? channel.page_id : nil
 
-    outgoing = conversation.messages.create!(
-      account: current_account,
-      inbox: inbox,
-      message_type: :outgoing,
-      content: dm_text,
-      sender: current_user
+    # Step 1: Send Private Reply via Meta Graph API
+    graph_base = platform == 'instagram' ? 'https://graph.instagram.com/v22.0' : 'https://graph.facebook.com/v22.0'
+    target_id = page_id || inbox_id
+
+    private_reply_response = HTTParty.post(
+      "#{graph_base}/#{target_id}/messages",
+      headers: { 'Content-Type' => 'application/json' },
+      body: {
+        recipient: { comment_id: fb_comment_id },
+        message: { text: dm_text },
+        access_token: access_token
+      }.to_json
     )
+
+    unless private_reply_response.success?
+      error_body = private_reply_response.parsed_response
+      Rails.logger.warn("[OmniAi::CommentsProxy] Private Reply API error: #{private_reply_response.code} #{error_body}")
+      return render json: {
+        error: 'private_reply_failed',
+        graph_error: error_body,
+        code: private_reply_response.code
+      }, status: :unprocessable_entity
+    end
+
+    fb_message_id = private_reply_response.parsed_response&.dig('message_id')
+    fb_recipient_id = private_reply_response.parsed_response&.dig('recipient_id')
+    Rails.logger.info("[OmniAi::CommentsProxy] Private Reply sent: message_id=#{fb_message_id} recipient_id=#{fb_recipient_id}")
+
+    # Step 2: Create contact + conversation in Chatwoot so it appears in inbox
+    resolved_commenter_id = fb_recipient_id || commenter_id
+    contact_inbox = find_or_create_contact(inbox, resolved_commenter_id, commenter_name, platform)
+
+    conversation = nil
+    message = nil
+    if contact_inbox
+      conversation = find_or_create_conversation(contact_inbox, inbox)
+      message = conversation.messages.create!(
+        account: current_account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: dm_text,
+        source_id: fb_message_id,
+        sender: current_user,
+        content_attributes: {
+          private_reply: true,
+          comment_id: fb_comment_id,
+          platform: platform
+        }
+      )
+    end
 
     # Update omni-ai backend with DM info
     proxy_put("/api/internal/comments/#{ERB::Util.url_encode(comment_id)}/dm", {
       dm_text: dm_text,
-      dm_conversation_id: conversation.display_id.to_s,
-      dm_message_id: outgoing.id.to_s,
-      dm_contact_id: contact_inbox.contact_id.to_s
+      dm_conversation_id: conversation&.display_id&.to_s,
+      dm_message_id: message&.id&.to_s,
+      dm_contact_id: contact_inbox&.contact_id&.to_s
     })
 
     broadcast_omni_comments_update
 
     render json: {
       success: true,
-      conversation_id: conversation.display_id,
-      message_id: outgoing.id
+      conversation_id: conversation&.display_id,
+      message_id: message&.id,
+      fb_message_id: fb_message_id
     }
   rescue StandardError => e
     Rails.logger.error("[OmniAi::CommentsProxy] DM send error: #{e.message}")
@@ -234,5 +280,16 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
       status: :open,
       assignee: current_user
     )
+  end
+
+  def resolve_access_token(inbox)
+    channel = inbox.channel
+    return nil unless channel
+
+    if channel.respond_to?(:page_access_token)
+      channel.page_access_token
+    elsif channel.respond_to?(:access_token)
+      channel.access_token
+    end
   end
 end
