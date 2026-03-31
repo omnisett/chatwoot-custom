@@ -120,7 +120,7 @@ class OmniAi::CommentsProxyController < Api::V1::Accounts::BaseController
   end
 
   def omni_ai_token
-    @omni_ai_token ||= ENV.fetch('OMNI_AI_WEBHOOK_TOKEN', '')
+    @omni_ai_token ||= ENV.fetch('OMNI_AI_COMMENTS_SECRET', ENV.fetch('OMNI_AI_WEBHOOK_TOKEN', ''))
   end
 
   def proxy_get(path, query_params = {})
