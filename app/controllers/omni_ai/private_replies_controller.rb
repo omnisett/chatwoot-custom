@@ -22,22 +22,23 @@
 #   comment_lead_id    — Omni-AI comment lead UUID (optional, for linking)
 
 class OmniAi::PrivateRepliesController < ActionController::API
+  include OmniAi::InboxResolver
+
   FB_GRAPH_BASE = 'https://graph.facebook.com/v22.0'
   IG_GRAPH_BASE = 'https://graph.instagram.com/v22.0'
 
   before_action :verify_token
 
   def create
-    inbox_id     = params[:inbox_id]
     comment_id   = params[:comment_id].to_s.strip
     message_text = params[:message_text].to_s.strip
     platform     = params[:platform].to_s.downcase.presence || 'facebook'
 
-    if inbox_id.blank? || comment_id.blank? || message_text.blank?
-      return render json: { error: 'inbox_id, comment_id and message_text are required' }, status: :bad_request
+    if comment_id.blank? || message_text.blank?
+      return render json: { error: 'comment_id and message_text are required' }, status: :bad_request
     end
 
-    inbox = Inbox.find_by(id: inbox_id)
+    inbox = resolve_inbox
     return render json: { error: 'inbox not found' }, status: :not_found unless inbox
 
     access_token = resolve_access_token(inbox)
@@ -109,6 +110,8 @@ class OmniAi::PrivateRepliesController < ActionController::API
 
     # ── Step 4: Create message record so it appears in Chatwoot ──
     message = conversation.messages.create!(
+      account_id: inbox.account_id,
+      inbox_id: inbox.id,
       message_type: :outgoing,
       content: message_text,
       source_id: fb_message_id,

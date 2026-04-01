@@ -9,21 +9,22 @@
 # Params: inbox_id, post_id, platform ("facebook" | "instagram")
 
 class OmniAi::PostInfoController < ActionController::API
+  include OmniAi::InboxResolver
+
   FB_GRAPH_BASE = 'https://graph.facebook.com/v22.0'
   IG_GRAPH_BASE = 'https://graph.instagram.com/v22.0'
 
   before_action :verify_token
 
   def show
-    inbox_id = params[:inbox_id]
     post_id  = params[:post_id].to_s.strip
     platform = params[:platform].to_s.downcase.presence || 'facebook'
 
-    if inbox_id.blank? || post_id.blank?
-      return render json: { error: 'inbox_id and post_id are required' }, status: :bad_request
+    if post_id.blank?
+      return render json: { error: 'post_id is required' }, status: :bad_request
     end
 
-    inbox = Inbox.find_by(id: inbox_id)
+    inbox = resolve_inbox
     return render json: { error: 'inbox not found' }, status: :not_found unless inbox
 
     access_token = resolve_access_token(inbox)
