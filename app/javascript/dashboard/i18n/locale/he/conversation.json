@@ -69,6 +69,15 @@
     "RATING_TITLE": "דירוג",
     "FEEDBACK_TITLE": "משוב",
     "REPLY_MESSAGE_NOT_FOUND": "ההודעה אינה זמינה",
+    "WHATSAPP_AD_REFERRAL": {
+      "FROM_AD_INSTAGRAM": "הגיע ממודעת אינסטגרם",
+      "FROM_AD_FACEBOOK": "הגיע ממודעת פייסבוק",
+      "FROM_AD_UNKNOWN": "הגיע ממודעה",
+      "FROM_POST_INSTAGRAM": "הגיע מפוסט באינסטגרם",
+      "FROM_POST_FACEBOOK": "הגיע מפוסט בפייסבוק",
+      "FROM_POST_UNKNOWN": "הגיע מפוסט",
+      "VIEW_AD": "צפה במקור"
+    },
     "CARD": {
       "SHOW_LABELS": "הצג תויות",
       "HIDE_LABELS": "הסתר תוויות"
