@@ -69,6 +69,15 @@
     "RATING_TITLE": "Rating",
     "FEEDBACK_TITLE": "Feedback",
     "REPLY_MESSAGE_NOT_FOUND": "Message not available",
+    "WHATSAPP_AD_REFERRAL": {
+      "FROM_AD_INSTAGRAM": "From an Instagram ad",
+      "FROM_AD_FACEBOOK": "From a Facebook ad",
+      "FROM_AD_UNKNOWN": "From an ad",
+      "FROM_POST_INSTAGRAM": "From an Instagram post",
+      "FROM_POST_FACEBOOK": "From a Facebook post",
+      "FROM_POST_UNKNOWN": "From a post",
+      "VIEW_AD": "View original"
+    },
     "CARD": {
       "SHOW_LABELS": "Show labels",
       "HIDE_LABELS": "Hide labels"
