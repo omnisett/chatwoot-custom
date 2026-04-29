@@ -165,6 +165,71 @@ describe Whatsapp::IncomingMessageWhatsappCloudService do
         end
       end
     end
+
+    context 'when message arrives via a Click-to-WhatsApp ad referral' do
+      # Meta's CTWA payload — see
+      # https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/components#referral-object
+      let(:referral_payload) do
+        {
+          source_url: 'https://fb.me/ads/123',
+          source_type: 'ad',
+          source_id: '1234567890',
+          headline: 'Free shipping today',
+          body: 'Order before midnight',
+          ctwa_clid: 'AQAAabcdef',
+          media_type: 'video',
+          media_url: 'https://scontent.example/v.mp4'
+        }
+      end
+      let(:ad_params) do
+        {
+          phone_number: whatsapp_channel.phone_number,
+          object: 'whatsapp_business_account',
+          entry: [{
+            changes: [{
+              value: {
+                contacts: [{ profile: { name: 'Ad Lead' }, wa_id: '16503071064' }],
+                messages: [{
+                  from: '16503071064',
+                  id: 'wamid.AD_REFERRAL_MESSAGE_ID',
+                  timestamp: '1770407829',
+                  text: { body: 'Hi, saw your ad' },
+                  type: 'text',
+                  referral: referral_payload
+                }]
+              }
+            }]
+          }]
+        }.with_indifferent_access
+      end
+
+      it 'persists the full referral object on Message#content_attributes' do
+        described_class.new(inbox: whatsapp_channel.inbox, params: ad_params).perform
+
+        ad_message = whatsapp_channel.inbox.messages.last
+        expect(ad_message.content).to eq('Hi, saw your ad')
+        # The downstream omni-ai consumer (extractAdContext) keys off
+        # source_id and ctwa_clid, so guard those explicitly.
+        expect(ad_message.content_attributes['referral']).to be_present
+        expect(ad_message.content_attributes['referral']['source_id']).to eq('1234567890')
+        expect(ad_message.content_attributes['referral']['ctwa_clid']).to eq('AQAAabcdef')
+        expect(ad_message.content_attributes['referral']['source_type']).to eq('ad')
+        expect(ad_message.content_attributes['referral']['headline']).to eq('Free shipping today')
+        expect(ad_message.content_attributes['referral']['body']).to eq('Order before midnight')
+      end
+
+      it 'does not set referral when the message has no referral block' do
+        # Re-run with a vanilla text payload (no `referral` key) to
+        # confirm we did not regress the common no-ad path.
+        plain_params = ad_params.deep_dup
+        plain_params[:entry][0][:changes][0][:value][:messages][0].delete(:referral)
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: plain_params).perform
+
+        plain_message = whatsapp_channel.inbox.messages.last
+        expect(plain_message.content_attributes['referral']).to be_nil
+      end
+    end
   end
 
   # Métodos auxiliares para reduzir o tamanho do exemplo

@@ -63,6 +63,19 @@ module Whatsapp::IncomingMessageServiceHelpers
     @in_reply_to_external_id = message['context']&.[]('id')
   end
 
+  # Click-to-WhatsApp (CTWA) ads attach a `referral` object to the very
+  # first inbound message after the customer taps "Send Message" on the
+  # ad creative. Per Meta WhatsApp Cloud API docs the keys we care
+  # about are: source_id, source_type, source_url, headline, body,
+  # ctwa_clid, media_type, media_url. We persist the whole hash on
+  # Message#content_attributes['referral'] so downstream consumers
+  # (e.g. omni-ai attribution and Chatwoot dashboards) can read the ad
+  # context without a second round-trip to Meta.
+  def process_referral(message)
+    referral = message['referral']
+    @referral = referral.is_a?(Hash) ? referral.deep_dup : nil
+  end
+
   def find_message_by_source_id(source_id)
     return unless source_id
 
