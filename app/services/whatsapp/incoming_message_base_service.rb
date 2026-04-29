@@ -66,6 +66,7 @@ class Whatsapp::IncomingMessageBaseService
     log_error(message) && return if error_webhook_event?(message)
 
     process_in_reply_to(message)
+    process_referral(message)
 
     message_type == 'contacts' ? create_contact_messages(message) : create_regular_message(message)
   end
@@ -177,6 +178,7 @@ class Whatsapp::IncomingMessageBaseService
   def create_message(message, source_id: nil)
     content_attrs = outgoing_echo ? { external_echo: true } : {}
     content_attrs[:in_reply_to_external_id] = @in_reply_to_external_id if @in_reply_to_external_id.present?
+    content_attrs[:referral] = @referral if @referral.present?
 
     @message = @conversation.messages.build(
       content: message_content(message),
