@@ -55,6 +55,7 @@ const headline = computed(() =>
   String(props.referral?.headline || '').trim()
 );
 const body = computed(() => String(props.referral?.body || '').trim());
+const sourceId = computed(() => String(props.referral?.source_id || '').trim());
 const sourceUrl = computed(() => props.referral?.source_url || '');
 
 // CTWA payloads are inconsistent across Meta versions — try the
@@ -75,7 +76,11 @@ const imageUrl = computed(() => {
 
 const hasAnyContent = computed(() => {
   return Boolean(
-    headline.value || body.value || sourceUrl.value || imageUrl.value
+    headline.value ||
+      body.value ||
+      sourceId.value ||
+      sourceUrl.value ||
+      imageUrl.value
   );
 });
 
@@ -107,6 +112,13 @@ const handleImageError = event => {
     <div class="flex flex-col flex-1 gap-0.5 min-w-0">
       <span class="text-xs font-medium truncate text-n-slate-11">
         {{ sourceLabel }}
+      </span>
+      <span
+        v-if="sourceId"
+        class="text-[11px] font-mono truncate text-n-slate-10"
+        :title="sourceId"
+      >
+        {{ sourceType === 'post' ? 'Post ID' : 'Ad ID' }}: {{ sourceId }}
       </span>
       <span
         v-if="headline"
