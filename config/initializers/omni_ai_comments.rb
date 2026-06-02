@@ -27,9 +27,25 @@ module OmniAi
 
     # Forward comment entries to Omni-AI backend via background job
     def self.forward(platform:, entries:, page_id: nil, instagram_id: nil)
-      return unless ENABLED
-      return if OMNI_AI_URL.blank?
-      return if entries.blank?
+      unless ENABLED
+        Rails.logger.warn("[OmniAi::CommentForwarder] Skipped #{platform} comment forwarding: OMNI_AI_COMMENTS_ENABLED=false")
+        return { enqueued: false, reason: 'disabled' }
+      end
+
+      if OMNI_AI_URL.blank?
+        Rails.logger.warn("[OmniAi::CommentForwarder] Skipped #{platform} comment forwarding: OMNI_AI_COMMENTS_URL is blank")
+        return { enqueued: false, reason: 'missing_url' }
+      end
+
+      if OMNI_AI_SECRET.blank?
+        Rails.logger.warn("[OmniAi::CommentForwarder] Skipped #{platform} comment forwarding: OMNI_AI_COMMENTS_SECRET is blank")
+        return { enqueued: false, reason: 'missing_secret' }
+      end
+
+      if entries.blank?
+        Rails.logger.warn("[OmniAi::CommentForwarder] Skipped #{platform} comment forwarding: entries are blank")
+        return { enqueued: false, reason: 'blank_entries' }
+      end
 
       OmniAi::CommentForwardJob.perform_later(
         platform: platform,
@@ -37,6 +53,12 @@ module OmniAi
         page_id: page_id,
         instagram_id: instagram_id
       )
+
+      Rails.logger.info(
+        "[OmniAi::CommentForwarder] Enqueued #{platform} comment forward " \
+        "(entries=#{entries.length}, url_set=#{OMNI_AI_URL.present?}, secret_set=#{OMNI_AI_SECRET.present?})"
+      )
+      { enqueued: true, reason: 'enqueued' }
     end
 
     # Detect if an entry array contains comment events (FB feed or IG comments)

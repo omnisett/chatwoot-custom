@@ -33,12 +33,16 @@ module OmniAi
             Rails.logger.info("[OmniAi::FB] POST /bot received, object=#{payload[:object]}, entries=#{payload[:entry]&.size}")
             if payload[:object] == 'page' && comment_entries?(payload[:entry])
               page_id = payload[:entry]&.first&.dig(:id)
-              OmniAi::CommentForwarder.forward(
+              result = OmniAi::CommentForwarder.forward(
                 platform: 'facebook',
                 entries: payload[:entry].as_json,
                 page_id: page_id
               )
-              Rails.logger.info("[OmniAi] Forwarded Facebook comment webhook (page_id=#{page_id})")
+              if result[:enqueued]
+                Rails.logger.info("[OmniAi] Enqueued Facebook comment webhook forward (page_id=#{page_id})")
+              else
+                Rails.logger.warn("[OmniAi] Skipped Facebook comment webhook forward (page_id=#{page_id}, reason=#{result[:reason]})")
+              end
             elsif payload[:object] == 'page'
               fields = payload[:entry]&.flat_map { |e| (e[:changes] || e['changes'] || []).map { |c| c[:field] || c['field'] } }
               # Debug: log full changes to see item/verb values

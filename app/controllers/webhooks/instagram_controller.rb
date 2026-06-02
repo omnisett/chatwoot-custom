@@ -9,12 +9,16 @@ class Webhooks::InstagramController < ActionController::API
       # ── Omni-AI: forward comment events to AI backend ──
       if OmniAi::CommentForwarder.contains_ig_comments?(entry_params)
         ig_id = OmniAi::CommentForwarder.extract_page_id(entry_params)
-        OmniAi::CommentForwarder.forward(
+        result = OmniAi::CommentForwarder.forward(
           platform: 'instagram',
           entries: entry_params,
           instagram_id: ig_id
         )
-        Rails.logger.info("[OmniAi] Forwarded Instagram comment webhook (ig_id=#{ig_id})")
+        if result[:enqueued]
+          Rails.logger.info("[OmniAi] Enqueued Instagram comment webhook forward (ig_id=#{ig_id})")
+        else
+          Rails.logger.warn("[OmniAi] Skipped Instagram comment webhook forward (ig_id=#{ig_id}, reason=#{result[:reason]})")
+        end
       end
 
       # ── Original Chatwoot DM flow (unchanged) ──
