@@ -5,6 +5,8 @@
 #    Hence there is no need to set user_id in message for outgoing echo messages.
 
 class Messages::Facebook::MessageBuilder < Messages::Messenger::MessageBuilder
+  REFERRAL_FIELDS = %w[source_id source_type source_url headline body image_url media_url media_type ctwa_clid].freeze
+
   attr_reader :response
 
   def initialize(response, inbox, outgoing_echo: false)
@@ -108,7 +110,9 @@ class Messages::Facebook::MessageBuilder < Messages::Messenger::MessageBuilder
     content_attributes = {
       in_reply_to_external_id: response.in_reply_to_external_id
     }
+    referral = referral_payload
     content_attributes[:external_echo] = true if @outgoing_echo
+    content_attributes[:referral] = referral if referral.present?
 
     {
       account_id: conversation.account_id,
@@ -120,6 +124,17 @@ class Messages::Facebook::MessageBuilder < Messages::Messenger::MessageBuilder
       content_attributes: content_attributes,
       sender: @outgoing_echo ? nil : @contact_inbox.contact
     }
+  end
+
+  def referral_payload
+    raw = response.respond_to?(:referral) ? response.referral : nil
+    return if raw.blank?
+
+    raw = raw.with_indifferent_access if raw.respond_to?(:with_indifferent_access)
+    REFERRAL_FIELDS.each_with_object({}) do |field, memo|
+      value = raw[field]
+      memo[field] = value if value.present?
+    end
   end
 
   def process_contact_params_result(result)

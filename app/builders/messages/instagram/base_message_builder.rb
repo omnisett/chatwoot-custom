@@ -1,4 +1,6 @@
 class Messages::Instagram::BaseMessageBuilder < Messages::Messenger::MessageBuilder
+  REFERRAL_FIELDS = %w[source_id source_type source_url headline body image_url media_url media_type ctwa_clid].freeze
+
   attr_reader :messaging
 
   def initialize(messaging, inbox, outgoing_echo: false)
@@ -154,6 +156,12 @@ class Messages::Instagram::BaseMessageBuilder < Messages::Messenger::MessageBuil
   end
 
   def message_params
+    content_attributes = {
+      in_reply_to_external_id: message_reply_attributes
+    }
+    referral = referral_payload
+    content_attributes[:referral] = referral if referral.present?
+
     params = {
       account_id: conversation.account_id,
       inbox_id: conversation.inbox_id,
@@ -162,14 +170,23 @@ class Messages::Instagram::BaseMessageBuilder < Messages::Messenger::MessageBuil
       source_id: message_identifier,
       content: message_content,
       sender: @outgoing_echo ? nil : contact,
-      content_attributes: {
-        in_reply_to_external_id: message_reply_attributes
-      }
+      content_attributes: content_attributes
     }
 
     params[:content_attributes][:external_echo] = true if @outgoing_echo
     params[:content_attributes][:is_unsupported] = true if message_is_unsupported?
     params
+  end
+
+  def referral_payload
+    raw = @messaging[:referral] || @messaging.dig(:message, :referral)
+    return if raw.blank?
+
+    raw = raw.with_indifferent_access if raw.respond_to?(:with_indifferent_access)
+    REFERRAL_FIELDS.each_with_object({}) do |field, memo|
+      value = raw[field]
+      memo[field] = value if value.present?
+    end
   end
 
   def message_already_exists?

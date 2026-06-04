@@ -30,6 +30,10 @@ class Integrations::Facebook::MessageParser
     @messaging.dig('message', 'attachments')
   end
 
+  def referral
+    @messaging['referral'] || @messaging.dig('message', 'referral')
+  end
+
   def identifier
     @messaging.dig('message', 'mid')
   end
