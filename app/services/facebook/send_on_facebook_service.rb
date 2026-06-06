@@ -45,12 +45,10 @@ class Facebook::SendOnFacebookService < Base::SendOnChannelService
   end
 
   def fb_text_message_params
-    {
+    with_messaging_type(
       recipient: { id: contact.get_source_id(inbox.id) },
-      message: fb_text_message_payload,
-      messaging_type: 'MESSAGE_TAG',
-      tag: message_tag
-    }
+      message: fb_text_message_payload
+    )
   end
 
   def fb_text_message_payload
@@ -79,7 +77,7 @@ class Facebook::SendOnFacebookService < Base::SendOnChannelService
   end
 
   def fb_attachment_message_params(attachment)
-    {
+    with_messaging_type(
       recipient: { id: contact.get_source_id(inbox.id) },
       message: {
         attachment: {
@@ -88,14 +86,29 @@ class Facebook::SendOnFacebookService < Base::SendOnChannelService
             url: attachment.download_url
           }
         }
-      },
-      messaging_type: 'MESSAGE_TAG',
-      tag: message_tag
-    }
+      }
+    )
   end
 
-  def message_tag
-    @message_tag ||= GlobalConfigService.load('ENABLE_MESSENGER_CHANNEL_HUMAN_AGENT', nil) ? 'HUMAN_AGENT' : 'ACCOUNT_UPDATE'
+  def with_messaging_type(params)
+    return params.merge(messaging_type: 'RESPONSE') if within_standard_reply_window?
+    return params.merge(messaging_type: 'MESSAGE_TAG', tag: 'HUMAN_AGENT') if human_agent_reply_window_enabled?
+
+    params.merge(messaging_type: 'RESPONSE')
+  end
+
+  def within_standard_reply_window?
+    last_incoming_message.present? && Time.current < last_incoming_message.created_at + 24.hours
+  end
+
+  def human_agent_reply_window_enabled?
+    return false unless GlobalConfigService.load('ENABLE_MESSENGER_CHANNEL_HUMAN_AGENT', nil)
+
+    last_incoming_message.present? && Time.current < last_incoming_message.created_at + 7.days
+  end
+
+  def last_incoming_message
+    @last_incoming_message ||= conversation.messages.incoming.last
   end
 
   def attachment_type(attachment)
