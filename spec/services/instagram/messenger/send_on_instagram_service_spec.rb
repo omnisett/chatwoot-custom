@@ -72,6 +72,18 @@ describe Instagram::Messenger::SendOnInstagramService do
           expect(response['message_id']).to eq('anyrandommessageid1234567890')
         end
 
+        it 'uses the current conversation contact inbox source id as the recipient' do
+          message = create(:message, message_type: 'outgoing', inbox: instagram_messenger_inbox, account: account, conversation: conversation)
+          allow(contact).to receive(:get_source_id).and_return('stale-source-id')
+
+          described_class.new(message: message).perform
+
+          expect(HTTParty).to have_received(:post).with(
+            kind_of(String),
+            hash_including(body: hash_including(recipient: { id: contact_inbox.source_id }))
+          )
+        end
+
         it 'if message is sent from chatwoot and is outgoing with multiple attachments' do
           message = build(
             :message,

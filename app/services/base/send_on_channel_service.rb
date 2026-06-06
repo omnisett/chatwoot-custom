@@ -24,6 +24,10 @@ class Base::SendOnChannelService
   delegate :contact, :contact_inbox, :inbox, to: :conversation
   delegate :channel, to: :inbox
 
+  def recipient_source_id
+    contact_inbox&.source_id || contact.get_source_id(inbox.id)
+  end
+
   def channel_class
     raise 'Overwrite this method in child class'
   end

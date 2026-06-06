@@ -54,6 +54,18 @@ describe Facebook::SendOnFacebookService do
         expect(bot).to have_received(:deliver)
       end
 
+      it 'uses the current conversation contact inbox source id as the recipient' do
+        message = create(:message, message_type: 'outgoing', inbox: facebook_inbox, account: account, conversation: conversation)
+        allow(contact).to receive(:get_source_id).and_return('stale-source-id')
+
+        described_class.new(message: message).perform
+
+        expect(bot).to have_received(:deliver).with(
+          hash_including(recipient: { id: contact_inbox.source_id }),
+          { page_id: facebook_channel.page_id }
+        )
+      end
+
       it 'raise and exception to validate access token' do
         message = create(:message, message_type: 'outgoing', inbox: facebook_inbox, account: account, conversation: conversation)
         allow(bot).to receive(:deliver).and_raise(Facebook::Messenger::FacebookError.new('message' => 'Error validating access token'))
