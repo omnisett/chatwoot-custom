@@ -34,6 +34,41 @@ RSpec.describe 'Webhooks::InstagramController', type: :request do
       expect(response).to have_http_status(:success)
     end
 
+    it 'forwards instagram comment events to Omni AI without requiring a DM event' do
+      comment_params = {
+        object: 'instagram',
+        entry: [
+          {
+            id: 'ig_123',
+            changes: [
+              {
+                field: 'comments',
+                value: {
+                  id: 'comment_123',
+                  text: 'price?',
+                  from: { id: 'user_123', username: 'client_ig' },
+                  media: { id: 'media_123' }
+                }
+              }
+            ]
+          }
+        ]
+      }.with_indifferent_access
+
+      allow(OmniAi::CommentForwarder).to receive(:forward).and_return({ enqueued: true, reason: 'enqueued' })
+      allow(Webhooks::InstagramEventsJob).to receive(:perform_later)
+
+      post '/webhooks/instagram', params: comment_params
+
+      expect(response).to have_http_status(:success)
+      expect(OmniAi::CommentForwarder).to have_received(:forward).with(
+        platform: 'instagram',
+        entries: comment_params[:entry],
+        instagram_id: 'ig_123'
+      )
+      expect(Webhooks::InstagramEventsJob).not_to have_received(:perform_later)
+    end
+
     context 'when processing echo events' do
       let!(:echo_params) { build(:instagram_story_mention_event_with_echo).with_indifferent_access }
 

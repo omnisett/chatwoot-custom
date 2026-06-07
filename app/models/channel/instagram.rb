@@ -19,6 +19,8 @@ class Channel::Instagram < ApplicationRecord
   include Reauthorizable
   self.table_name = 'channel_instagram'
 
+  SUBSCRIBED_FIELDS = %w[messages message_reactions messaging_seen comments].freeze
+
   # TODO: Remove guard once encryption keys become mandatory (target 3-4 releases out).
   encrypts :access_token if Chatwoot.encryption_configured?
 
@@ -28,6 +30,7 @@ class Channel::Instagram < ApplicationRecord
   validates :instagram_id, uniqueness: true, presence: true
 
   after_create_commit :subscribe
+  after_update_commit :subscribe, if: :saved_change_to_access_token?
   before_destroy :unsubscribe
 
   def name
@@ -47,7 +50,7 @@ class Channel::Instagram < ApplicationRecord
     HTTParty.post(
       "https://graph.instagram.com/v22.0/#{instagram_id}/subscribed_apps",
       query: {
-        subscribed_fields: %w[messages message_reactions messaging_seen],
+        subscribed_fields: SUBSCRIBED_FIELDS,
         access_token: access_token
       }
     )

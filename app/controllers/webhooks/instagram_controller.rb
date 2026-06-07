@@ -4,7 +4,8 @@ class Webhooks::InstagramController < ActionController::API
   def events
     Rails.logger.info('Instagram webhook received events')
     if params['object'].casecmp('instagram').zero?
-      entry_params = params.to_unsafe_hash[:entry]
+      unsafe_params = params.to_unsafe_h
+      entry_params = unsafe_params[:entry] || unsafe_params['entry'] || []
 
       # ── Omni-AI: forward comment events to AI backend ──
       if OmniAi::CommentForwarder.contains_ig_comments?(entry_params)
@@ -45,7 +46,10 @@ class Webhooks::InstagramController < ActionController::API
     return false unless entry_params.is_a?(Array)
 
     entry_params.any? do |entry|
-      (entry[:messaging].present? || entry[:standby].present?)
+      entry[:messaging].present? ||
+        entry['messaging'].present? ||
+        entry[:standby].present? ||
+        entry['standby'].present?
     end
   end
 
@@ -54,8 +58,11 @@ class Webhooks::InstagramController < ActionController::API
 
     entry_params.any? do |entry|
       # Check messaging array for echo events
-      messaging_events = entry[:messaging] || []
-      messaging_events.any? { |messaging| messaging.dig(:message, :is_echo).present? }
+      messaging_events = entry[:messaging] || entry['messaging'] || []
+      messaging_events.any? do |messaging|
+        message = messaging[:message] || messaging['message'] || {}
+        message[:is_echo].present? || message['is_echo'].present?
+      end
     end
   end
 
