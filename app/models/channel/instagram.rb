@@ -46,16 +46,27 @@ class Channel::Instagram < ApplicationRecord
   end
 
   def subscribe
+    fields = SUBSCRIBED_FIELDS.join(',')
     # ref https://developers.facebook.com/docs/instagram-platform/webhooks#enable-subscriptions
-    HTTParty.post(
+    response = HTTParty.post(
       "https://graph.instagram.com/v22.0/#{instagram_id}/subscribed_apps",
       query: {
-        subscribed_fields: SUBSCRIBED_FIELDS,
+        subscribed_fields: fields,
         access_token: access_token
       }
     )
+
+    if response.success?
+      Rails.logger.info("[Instagram] Subscribed instagram_id=#{instagram_id} to webhooks: fields=#{fields}")
+    else
+      Rails.logger.error(
+        "[Instagram] Failed to subscribe instagram_id=#{instagram_id} " \
+        "to webhooks: status=#{response.code} body=#{response.body&.truncate(500)} fields=#{fields}"
+      )
+    end
+    response
   rescue StandardError => e
-    Rails.logger.debug { "Rescued: #{e.inspect}" }
+    Rails.logger.error("[Instagram] Subscribe error instagram_id=#{instagram_id}: #{e.class} - #{e.message}")
     true
   end
 
