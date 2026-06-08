@@ -12,9 +12,6 @@
 class OmniAi::CommentRepliesController < ActionController::API
   include OmniAi::InboxResolver
 
-  IG_GRAPH_BASE = 'https://graph.instagram.com/v22.0'
-  FB_GRAPH_BASE = 'https://graph.facebook.com/v22.0'
-
   before_action :verify_token
 
   def create
@@ -29,28 +26,48 @@ class OmniAi::CommentRepliesController < ActionController::API
     inbox = resolve_inbox
     return render json: { error: 'inbox not found' }, status: :not_found unless inbox
 
-    access_token = resolve_access_token(inbox)
-    unless access_token.present?
-      return render json: { error: 'inbox channel has no access_token' }, status: :unprocessable_entity
+    candidates = reply_candidates(inbox, platform).select do |candidate|
+      candidate[:access_token].present?
+    end
+    if candidates.empty?
+      return render json: { error: 'inbox channel has no usable access_token' }, status: :unprocessable_entity
     end
 
-    graph_base = platform == 'facebook' ? FB_GRAPH_BASE : IG_GRAPH_BASE
-    # Instagram: POST /{comment-id}/replies
-    # Facebook:  POST /{comment-id}/comments
-    action = platform == 'facebook' ? 'comments' : 'replies'
+    attempts = []
+    last_response = nil
 
-    response = HTTParty.post(
-      "#{graph_base}/#{comment_id}/#{action}",
-      query: { message: reply_text, access_token: access_token }
-    )
+    candidates.each do |candidate|
+      response = HTTParty.post(
+        "#{candidate[:graph_base]}/#{comment_id}/#{candidate[:edge]}",
+        query: { message: reply_text, access_token: candidate[:access_token] }
+      )
 
-    if response.success?
-      Rails.logger.info("[OmniAi] comment_reply posted: comment=#{comment_id} platform=#{platform}")
-      render json: { success: true, id: response.parsed_response['id'] }, status: :ok
-    else
-      Rails.logger.warn("[OmniAi] comment_reply Graph API error: #{response.code} #{response.body}")
-      render json: { error: response.parsed_response, code: response.code }, status: :unprocessable_entity
+      attempts << { source: candidate[:source], code: response.code }
+      if response.success?
+        Rails.logger.info(
+          "[OmniAi] comment_reply posted: comment=#{comment_id} " \
+          "platform=#{platform} source=#{candidate[:source]}"
+        )
+        return render json: {
+          success: true,
+          id: parsed_response(response)['id'],
+          source: candidate[:source]
+        }, status: :ok
+      end
+
+      last_response = response
+      Rails.logger.warn(
+        "[OmniAi] comment_reply Graph API error: comment=#{comment_id} " \
+        "platform=#{platform} source=#{candidate[:source]} " \
+        "code=#{response.code} body=#{response.body&.truncate(500)}"
+      )
     end
+
+    render json: {
+      error: parsed_response(last_response),
+      code: last_response&.code,
+      attempts: attempts
+    }, status: :unprocessable_entity
   end
 
   private
@@ -62,14 +79,99 @@ class OmniAi::CommentRepliesController < ActionController::API
     return head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(actual, expected)
   end
 
-  def resolve_access_token(inbox)
+  def reply_candidates(inbox, platform)
     channel = inbox.channel
-    return nil unless channel
+    return [] unless channel
 
-    if channel.respond_to?(:page_access_token)
-      channel.page_access_token
-    elsif channel.respond_to?(:access_token)
-      channel.access_token
+    return facebook_reply_candidates(channel) if platform == 'facebook'
+
+    instagram_reply_candidates(channel, inbox.account_id)
+  end
+
+  def facebook_reply_candidates(channel)
+    return [] unless channel.respond_to?(:page_access_token)
+
+    [
+      {
+        source: 'facebook_page',
+        graph_base: facebook_graph_base,
+        edge: 'comments',
+        access_token: safe_access_token(channel, :page_access_token)
+      }
+    ]
+  end
+
+  def instagram_reply_candidates(channel, account_id)
+    candidates = []
+
+    if channel.is_a?(Channel::Instagram)
+      candidates << {
+        source: 'instagram_business_login',
+        graph_base: instagram_graph_base,
+        edge: 'replies',
+        access_token: safe_access_token(channel, :access_token)
+      }
+
+      facebook_channel = Channel::FacebookPage.find_by(
+        account_id: account_id,
+        instagram_id: channel.instagram_id
+      )
+      candidates.concat(instagram_via_facebook_candidates(facebook_channel)) if facebook_channel
+    elsif channel.is_a?(Channel::FacebookPage)
+      candidates.concat(instagram_via_facebook_candidates(channel))
+
+      instagram_channel = if channel.instagram_id.present?
+                            Channel::Instagram.find_by(instagram_id: channel.instagram_id)
+                          end
+      if instagram_channel
+        candidates << {
+          source: 'instagram_business_login',
+          graph_base: instagram_graph_base,
+          edge: 'replies',
+          access_token: safe_access_token(instagram_channel, :access_token)
+        }
+      end
     end
+
+    candidates
+  end
+
+  def instagram_via_facebook_candidates(channel)
+    return [] unless channel&.respond_to?(:page_access_token)
+
+    [
+      {
+        source: 'facebook_page_instagram_graph',
+        graph_base: facebook_graph_base,
+        edge: 'replies',
+        access_token: safe_access_token(channel, :page_access_token)
+      }
+    ]
+  end
+
+  def safe_access_token(channel, method_name)
+    channel.public_send(method_name)
+  rescue StandardError => e
+    Rails.logger.warn(
+      "[OmniAi] comment_reply token resolution failed: channel=#{channel.class.name} " \
+      "error=#{e.class} #{e.message}"
+    )
+    nil
+  end
+
+  def instagram_graph_base
+    "https://graph.instagram.com/#{GlobalConfigService.load('INSTAGRAM_API_VERSION', 'v24.0')}"
+  end
+
+  def facebook_graph_base
+    "https://graph.facebook.com/#{GlobalConfigService.load('FACEBOOK_API_VERSION', 'v24.0')}"
+  end
+
+  def parsed_response(response)
+    return {} unless response
+
+    response.parsed_response || {}
+  rescue StandardError
+    { 'raw' => response.body }
   end
 end
