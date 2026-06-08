@@ -70,7 +70,8 @@ module OmniAi
 
     def resolve_account_id(platform, page_id, instagram_id)
       channel = if platform == 'instagram' && instagram_id.present?
-                  Channel::FacebookPage.find_by(instagram_id: instagram_id)
+                  Channel::Instagram.find_by(instagram_id: instagram_id) ||
+                    Channel::FacebookPage.find_by(instagram_id: instagram_id)
                 elsif page_id.present?
                   Channel::FacebookPage.find_by(page_id: page_id)
                 end

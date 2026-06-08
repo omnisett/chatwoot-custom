@@ -35,6 +35,8 @@ module OmniAi
       return if token.blank?
 
       media_items(channel, token).each do |media|
+        next if media['comments_count'].to_i <= 0
+
         comments_for_media(media['id'], token).each do |comment|
           forward_comment(channel, media, comment)
         end
@@ -85,6 +87,7 @@ module OmniAi
       comment_id = comment['id'].to_s
       return if comment_id.blank? || comment['text'].blank?
       return if too_old?(comment['timestamp'])
+      return if own_comment?(channel, comment)
       return if seen?(comment_id)
 
       entry = {
@@ -126,6 +129,12 @@ module OmniAi
       return {} if username.blank?
 
       { id: username, username: username }
+    end
+
+    def own_comment?(channel, comment)
+      username = comment['username'].to_s.downcase
+      inbox_name = channel.inbox&.name.to_s.downcase
+      username.present? && inbox_name.present? && username == inbox_name
     end
 
     def seen?(comment_id)
